@@ -115,15 +115,25 @@ How to Test
 Plaintext
 
 ├── auth-service/                # Authentication & JWT
+
 ├── user-management-service/     # User CRUD
+
 ├── device-management-service/   # Device CRUD
+
 ├── monitoring-service/          # Data processing & Storage (Replicated)
+
 ├── load-balancing-service/      # Routes sensor data to replicas
+
 ├── websocket-service/           # Handles real-time push notifications
+
 ├── customer-support-service/    # Chat logic (Rules + AI)
+
 ├── frontend/                    # React Application
+
 ├── simulator/                   # Python Data Generator
+
 ├── traefik-config/              # API Gateway Configuration
+
 └── docker-compose.yml           # Deployment Descriptor
 
 ## Other useful commands 
