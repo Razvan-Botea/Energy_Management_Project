@@ -1,0 +1,316 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    ports:
+      - "8000:80"
+      - "8080:8080"
+    volumes:
+      - ./traefik-config/traefik.yml:/etc/traefik/traefik.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - tema1_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`localhost`) && (PathPrefix(`/dashboard`) || Path(`/api`))"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
+      - "traefik.http.middlewares.strip-api.stripprefix.prefixes=/api"
+      - "traefik.http.middlewares.my-forward-auth.forwardauth.address=http://auth-service:8080/api/auth/validate"
+      - "traefik.http.middlewares.my-forward-auth.forwardauth.authResponseHeaders=Authorization"
+
+  user-db:
+    image: postgres:16
+    container_name: user-db
+    restart: always
+    environment: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: root, POSTGRES_DB: user_db }
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    networks:
+      - tema1_net
+
+  device-db:
+    image: postgres:16
+    container_name: device-db
+    restart: always
+    environment: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: root, POSTGRES_DB: device_db }
+    volumes:
+      - device-db-data:/var/lib/postgresql/data
+    networks:
+      - tema1_net
+
+  credential-db:
+    image: postgres:16
+    container_name: credential-db
+    restart: always
+    environment: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: root, POSTGRES_DB: credential_db }
+    volumes:
+      - credential-db-data:/var/lib/postgresql/data
+    networks:
+      - tema1_net
+
+  monitoring-db:
+    image: postgres:16
+    container_name: monitoring-db
+    restart: always
+    environment: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: root, POSTGRES_DB: monitoring_db }
+    volumes:
+      - monitoring-db-data:/var/lib/postgresql/data
+    networks:
+      - tema1_net
+
+  load-balancing-service:
+    image: ds-lb-service:latest
+    build:
+      context: ./load-balancing-service 
+      dockerfile: Dockerfile
+    container_name: load-balancing-service
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - SPRING_RABBITMQ_ADDRESSES=amqps://pzmgmmeq:vrQJsWZakcDjjwcPOxv8FHRzUssr5qeU@collie.lmq.cloudamqp.com/pzmgmmeq
+      - APP_QUEUE_CENTRAL=sensor.data.central
+      - APP_QUEUE_REPLICA_PREFIX=sensor.data.replica.
+      - APP_REPLICA_COUNT=3
+    networks:
+      - tema1_net
+
+  monitoring-replica-1:
+    image: ds-monitoring-service:latest
+    build:
+      context: ./monitoring-service/demo 
+      dockerfile: Dockerfile
+    container_name: monitoring-replica-1
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - DB_IP=monitoring-db
+      - DB_PORT=5432
+      - DB_DBNAME=monitoring_db
+      - DB_USER=postgres
+      - DB_PASSWORD=root
+      - SPRING_RABBITMQ_ADDRESSES=amqps://pzmgmmeq:vrQJsWZakcDjjwcPOxv8FHRzUssr5qeU@collie.lmq.cloudamqp.com/pzmgmmeq
+      - REPLICA_ID=1
+      - APP_QUEUE_NAME=sensor.data.replica.1
+    networks:
+      - tema1_net
+    depends_on:
+      - monitoring-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.monitoring-service.rule=Host(`localhost`) && PathPrefix(`/api/monitoring`)"
+      - "traefik.http.routers.monitoring-service.entrypoints=web"
+      - "traefik.http.routers.monitoring-service.priority=5"
+      - "traefik.http.routers.monitoring-service.middlewares=my-forward-auth@docker,strip-api@docker"
+      - "traefik.http.routers.monitoring-service.service=monitoring-service"
+      - "traefik.http.services.monitoring-service.loadbalancer.server.port=8080"
+      
+      - "traefik.http.routers.monitoring-service-options.rule=Host(`localhost`) && PathPrefix(`/api/monitoring`) && Method(`OPTIONS`)"
+      - "traefik.http.routers.monitoring-service-options.entrypoints=web"
+      - "traefik.http.routers.monitoring-service-options.priority=15"
+      - "traefik.http.routers.monitoring-service-options.middlewares=strip-api@docker"
+      - "traefik.http.routers.monitoring-service-options.service=monitoring-service"
+
+  monitoring-replica-2:
+    image: ds-monitoring-service:latest
+    build:
+      context: ./monitoring-service/demo 
+      dockerfile: Dockerfile
+    container_name: monitoring-replica-2
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - DB_IP=monitoring-db
+      - DB_PORT=5432
+      - DB_DBNAME=monitoring_db
+      - DB_USER=postgres
+      - DB_PASSWORD=root
+      - SPRING_RABBITMQ_ADDRESSES=amqps://pzmgmmeq:vrQJsWZakcDjjwcPOxv8FHRzUssr5qeU@collie.lmq.cloudamqp.com/pzmgmmeq
+      - REPLICA_ID=2
+      - APP_QUEUE_NAME=sensor.data.replica.2
+    networks:
+      - tema1_net
+    depends_on:
+      - monitoring-db
+
+  monitoring-replica-3:
+    image: ds-monitoring-service:latest
+    build:
+      context: ./monitoring-service/demo 
+      dockerfile: Dockerfile
+    container_name: monitoring-replica-3
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - DB_IP=monitoring-db
+      - DB_PORT=5432
+      - DB_DBNAME=monitoring_db
+      - DB_USER=postgres
+      - DB_PASSWORD=root
+      - SPRING_RABBITMQ_ADDRESSES=amqps://pzmgmmeq:vrQJsWZakcDjjwcPOxv8FHRzUssr5qeU@collie.lmq.cloudamqp.com/pzmgmmeq
+      - REPLICA_ID=3
+      - APP_QUEUE_NAME=sensor.data.replica.3
+    networks:
+      - tema1_net
+    depends_on:
+      - monitoring-db
+
+  user-service:
+    image: ds-user-service:latest
+    build:
+      context: ./user-management-service/demo
+      dockerfile: Dockerfile
+    container_name: user-service
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - DB_IP=user-db
+      - DB_PORT=5432
+      - DB_DBNAME=user_db
+      - DB_USER=postgres
+      - DB_PASSWORD=root
+      - AUTH_SERVICE_URL=http://auth-service:8080/api/auth/register
+      - SPRING_RABBITMQ_ADDRESSES=amqps://pzmgmmeq:vrQJsWZakcDjjwcPOxv8FHRzUssr5qeU@collie.lmq.cloudamqp.com/pzmgmmeq
+    networks:
+      - tema1_net
+    depends_on:
+      - user-db
+      - auth-service
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.user-service.loadbalancer.server.port=8080"
+      
+      - "traefik.http.routers.user-service-public.rule=Host(`localhost`) && PathPrefix(`/api/users`) && Method(`POST`)"
+      - "traefik.http.routers.user-service-public.entrypoints=web"
+      - "traefik.http.routers.user-service-public.priority=10"
+      - "traefik.http.routers.user-service-public.middlewares=strip-api@docker"
+      - "traefik.http.routers.user-service-public.service=user-service"
+
+      - "traefik.http.routers.user-service-options.rule=Host(`localhost`) && PathPrefix(`/api/users`) && Method(`OPTIONS`)"
+      - "traefik.http.routers.user-service-options.entrypoints=web"
+      - "traefik.http.routers.user-service-options.priority=15"
+      - "traefik.http.routers.user-service-options.middlewares=strip-api@docker"
+      - "traefik.http.routers.user-service-options.service=user-service"
+
+      - "traefik.http.routers.user-service-protected.rule=Host(`localhost`) && PathPrefix(`/api/users`)"
+      - "traefik.http.routers.user-service-protected.entrypoints=web"
+      - "traefik.http.routers.user-service-protected.priority=5"
+      - "traefik.http.routers.user-service-protected.middlewares=my-forward-auth@docker,strip-api@docker"
+      - "traefik.http.routers.user-service-protected.service=user-service"
+
+  device-service:
+    image: ds-device-service:latest
+    build:
+      context: ./device-management-service/demo
+      dockerfile: Dockerfile
+    container_name: device-service
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - DB_IP=device-db
+      - DB_PORT=5432
+      - DB_DBNAME=device_db
+      - DB_USER=postgres
+      - DB_PASSWORD=root
+      - SPRING_RABBITMQ_ADDRESSES=amqps://pzmgmmeq:vrQJsWZakcDjjwcPOxv8FHRzUssr5qeU@collie.lmq.cloudamqp.com/pzmgmmeq
+    networks:
+      - tema1_net
+    depends_on:
+      - device-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.device-service-options.rule=Host(`localhost`) && PathPrefix(`/api/devices`) && Method(`OPTIONS`)"
+      - "traefik.http.routers.device-service-options.entrypoints=web"
+      - "traefik.http.routers.device-service-options.priority=15"
+      - "traefik.http.routers.device-service-options.middlewares=strip-api@docker"
+      - "traefik.http.routers.device-service-options.service=device-service"
+      
+      - "traefik.http.routers.device-service.rule=Host(`localhost`) && PathPrefix(`/api/devices`)"
+      - "traefik.http.routers.device-service.entrypoints=web"
+      - "traefik.http.routers.device-service.priority=5"
+      - "traefik.http.routers.device-service.middlewares=my-forward-auth@docker,strip-api@docker"
+      - "traefik.http.services.device-service.loadbalancer.server.port=8080"
+      - "traefik.http.routers.device-service.service=device-service"
+
+  auth-service:
+    image: ds-auth-service:latest
+    build:
+      context: ./authorization-service/demo
+      dockerfile: Dockerfile
+    container_name: auth-service
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - DB_IP=credential-db
+      - DB_PORT=5432
+      - DB_DBNAME=credential_db
+      - DB_USER=postgres
+      - DB_PASSWORD=root
+      - JWT_SECRET=AM/vJzMYv5bVMAZ8N6E6/2gHgbYyYdGfF0aL4mweUsk/86xZfGkYIAQbM/bqVAKLh5+JmQJdIq/Dk4tyv2NNAg==
+    networks:
+      - tema1_net
+    depends_on:
+      - credential-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth-service-login.rule=Host(`localhost`) && PathPrefix(`/api/auth/login`)"
+      - "traefik.http.routers.auth-service-login.entrypoints=web"
+      - "traefik.http.services.auth-service.loadbalancer.server.port=8080"
+      - "traefik.http.routers.auth-service-login.service=auth-service"
+
+  websocket-service:
+    image: ds-websocket-service:latest
+    build:
+      context: ./websocket-service 
+      dockerfile: Dockerfile
+    container_name: websocket-service
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - SPRING_RABBITMQ_ADDRESSES=amqps://pzmgmmeq:vrQJsWZakcDjjwcPOxv8FHRzUssr5qeU@collie.lmq.cloudamqp.com/pzmgmmeq
+    networks:
+      - tema1_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.websocket-service.rule=Host(`localhost`) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.websocket-service.entrypoints=web"
+      - "traefik.http.services.websocket-service.loadbalancer.server.port=8080"
+
+  customer-support-microservice:
+    image: ds-support-service:latest
+    build:
+      context: ./customer-support-microservice
+      dockerfile: Dockerfile
+    container_name: customer-support-microservice
+    restart: on-failure
+    environment:
+      - PORT=8080
+      - SPRING_RABBITMQ_ADDRESSES=amqps://pzmgmmeq:vrQJsWZakcDjjwcPOxv8FHRzUssr5qeU@collie.lmq.cloudamqp.com/pzmgmmeq
+      - DB_IP=user-db
+      - DB_PORT=5432
+      - DB_DBNAME=user_db
+      - DB_USER=postgres
+      - DB_PASSWORD=root
+    networks:
+      - tema1_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.support-service.rule=Host(`localhost`) && PathPrefix(`/api/chat`)"
+      - "traefik.http.routers.support-service.entrypoints=web"
+      - "traefik.http.routers.support-service.middlewares=strip-api@docker"
+      - "traefik.http.routers.support-service.service=support-service"
+      - "traefik.http.services.support-service.loadbalancer.server.port=8080"
+
+volumes:
+  user-db-data:
+  device-db-data:
+  credential-db-data:
+  monitoring-db-data: 
+
+networks:
+  tema1_net:
+    driver: bridge

@@ -1,0 +1,10 @@
+Terminal 1 (Load Balancer):
+docker logs -f load-balancing-service
+
+Terminal 2 (Replica 1):
+docker logs -f monitoring-replica-1
+
+Terminal 3 (Replica 2):
+docker logs -f monitoring-replica-2
+
+Terminal 4 (Simulator): Run your script.
