@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import './App.css'; // Import our stylesheet
+import './App.css'; 
 
 import LoginPage from './pages/LoginPage';
 import Home from './pages/Home';

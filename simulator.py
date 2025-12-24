@@ -16,20 +16,19 @@ def get_rabbitmq_connection():
     return pika.BlockingConnection(params)
 
 def generate_value_for_hour(hour):
-    return 5000.0
-#    """Generates realistic consumption based on the time of day."""
-#    if 0 <= hour < 6:
-#        base = 0.2  # Night
-#    elif 6 <= hour < 10:
-#        base = 1.0  # Morning
-#    elif 10 <= hour < 17:
-#        base = 0.6  # Work hours
-#    elif 17 <= hour < 22:
-#        base = 2.5  # Evening peak
-#    else:
-#        base = 0.5  # Late night
-#    val = base + random.uniform(-0.1, 0.1) * base
-#    return round(max(0.05, val), 2)
+    """Generates realistic consumption based on the time of day."""
+    if 0 <= hour < 6:
+        base = 0.2  # Night
+    elif 6 <= hour < 10:
+        base = 1.0  # Morning
+    elif 10 <= hour < 17:
+        base = 0.6  # Work hours
+    elif 17 <= hour < 22:
+        base = 2.5  # Evening peak
+    else:
+        base = 0.5  # Late night
+    val = base + random.uniform(-0.1, 0.1) * base
+    return round(max(0.05, val), 2)
 
 def main():
     print(f"--- GENERATOR -> LOAD BALANCER ---")

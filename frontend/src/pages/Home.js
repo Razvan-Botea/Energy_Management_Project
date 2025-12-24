@@ -17,7 +17,6 @@ function Home() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Fallback (shouldn't happen)
   return <Navigate to="/login" replace />;
 }
 

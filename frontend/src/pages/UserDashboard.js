@@ -1,35 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../services/api';
-// --- FIX: Remove unused SockJS/Stomp imports since we use @stomp/stompjs now ---
 import { Client } from '@stomp/stompjs';
 import ChatComponent from '../components/ChatComponent';
 
-// Import Recharts components
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 
 function UserDashboard() {
   const auth = useAuth();
-  
-  // Data State
+
   const [devices, setDevices] = useState([]);
   const [chartData, setChartData] = useState([]);
   
-  // Selection State
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   
-  // UI State
   const [loadingDevices, setLoadingDevices] = useState(true);
   const [loadingChart, setLoadingChart] = useState(false);
   const [error, setError] = useState('');
   
-  // Notification State
   const [notifications, setNotifications] = useState([]);
 
-  // --- 1. WebSocket for ALERTS ---
   useEffect(() => {
     if (!auth.userId) return;
 
@@ -59,7 +52,6 @@ function UserDashboard() {
     };
   }, [auth.userId]); 
 
-  // --- 2. Fetch Users Devices on Load ---
   useEffect(() => {
     const fetchDevices = async () => {
       try {
@@ -76,7 +68,6 @@ function UserDashboard() {
     if (auth.token && auth.userId) fetchDevices();
   }, [auth.token, auth.userId]);
 
-  // --- 3. Fetch Chart Data ---
   useEffect(() => {
     const fetchMonitoringData = async () => {
       if (!selectedDeviceId || !selectedDate) return;

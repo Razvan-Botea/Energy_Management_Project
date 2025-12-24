@@ -14,7 +14,7 @@ function LoginPage() {
     setError('');
     try {
       await auth.login(username, password);
-      navigate('/'); // Redirect to home page after login
+      navigate('/'); 
     } catch (err) {
       setError('Failed to log in. Check username and password.');
       console.error(err);
